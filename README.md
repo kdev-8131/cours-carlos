@@ -183,7 +183,7 @@ git push
 
 ## Projet pratique : système d'authentification Python
 
-Le fichier `auth.py` contient un système local d'inscription et de connexion. Il utilise uniquement la bibliothèque standard de Python :
+Le fichier `auth.py` contient un exemple très simple, adapté à une première heure de Python. Il utilise uniquement la bibliothèque standard :
 
 - les utilisateurs sont enregistrés dans un fichier JSON local ;
 - les mots de passe ne sont jamais stockés en clair ;
@@ -200,7 +200,7 @@ Le fichier `auth.py` contient un système local d'inscription et de connexion. I
 python auth.py
 ```
 
-Un menu permet ensuite de créer un compte, de se connecter ou de quitter.
+Un menu permet ensuite de créer un compte ou de se connecter. Le code montre des variables, des fonctions, des conditions et un dictionnaire.
 
 Les mots de passe saisis ne sont pas affichés dans le terminal. Le fichier `users.json` est créé automatiquement et ignoré par Git afin de ne pas publier les comptes.
 
