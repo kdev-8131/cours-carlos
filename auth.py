@@ -1,8 +1,6 @@
 """Exemple très simple d'inscription et de connexion en Python."""
 
 import getpass
-import hashlib
-import hmac
 import json
 import os
 
@@ -27,15 +25,6 @@ def enregistrer_utilisateurs(utilisateurs, fichier=FICHIER):
         json.dump(utilisateurs, fichier_json, indent=2)
 
 
-def hacher(mot_de_passe, sel):
-    # Cette fonction transforme le mot de passe en empreinte sécurisée.
-    # Il n'est pas nécessaire de comprendre cette ligne dès le premier cours.
-    resultat = hashlib.pbkdf2_hmac(
-        "sha256", mot_de_passe.encode(), bytes.fromhex(sel), 100_000
-    )
-    return resultat.hex()
-
-
 def register_user(nom, mot_de_passe, fichier=FICHIER):
     utilisateurs = lire_utilisateurs(fichier)
     nom = nom.strip().lower()
@@ -50,12 +39,10 @@ def register_user(nom, mot_de_passe, fichier=FICHIER):
     if nom in utilisateurs:
         return False
 
-    # Le sel est une valeur aléatoire ajoutée avant le hachage.
-    sel = os.urandom(16).hex()
-
     utilisateurs[nom] = {
-        "mot_de_passe": hacher(mot_de_passe, sel),
-        "sel": sel,
+        "mot_de_passe": mot_de_passe,
+        "score": 0,
+        "niveau": 1,
     }
 
     enregistrer_utilisateurs(utilisateurs, fichier)
@@ -70,9 +57,7 @@ def authenticate_user(nom, mot_de_passe, fichier=FICHIER):
         return False
 
     utilisateur = utilisateurs[nom]
-    empreinte = hacher(mot_de_passe, utilisateur["sel"])
-
-    return hmac.compare_digest(empreinte, utilisateur["mot_de_passe"])
+    return mot_de_passe == utilisateur["mot_de_passe"]
 
 
 def main():

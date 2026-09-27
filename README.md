@@ -186,8 +186,7 @@ git push
 Le fichier `auth.py` contient un exemple très simple, adapté à une première heure de Python. Il utilise uniquement la bibliothèque standard :
 
 - les utilisateurs sont enregistrés dans un fichier JSON local ;
-- les mots de passe ne sont jamais stockés en clair ;
-- chaque mot de passe est haché avec `scrypt` et un sel aléatoire ;
+- les comptes, mots de passe et scores sont enregistrés dans un fichier JSON ;
 - les noms d'utilisateur ne sont pas sensibles aux majuscules.
 
 ### Prérequis
@@ -204,6 +203,8 @@ Un menu permet ensuite de créer un compte ou de se connecter. Le code montre de
 
 Les mots de passe saisis ne sont pas affichés dans le terminal. Le fichier `users.json` est créé automatiquement et ignoré par Git afin de ne pas publier les comptes.
 
+> **Attention :** ce projet stocke les mots de passe en clair pour simplifier le premier exercice. Il sert uniquement à apprendre. Il ne faut jamais utiliser de vrais mots de passe ni employer cette méthode dans une véritable application.
+
 ### Lancer les tests
 
 ```bash
@@ -211,3 +212,20 @@ python -m unittest -v
 ```
 
 Ce projet est un exemple pédagogique d'authentification locale. Pour un site en production, il faut utiliser le système d'authentification éprouvé d'un framework web, protéger les sessions, activer HTTPS et prévoir une limitation des tentatives de connexion.
+
+## Petit jeu avec progression
+
+Le fichier `jeu.py` contient un jeu du nombre mystère :
+
+- le joueur doit d'abord se connecter avec son compte ;
+- il doit trouver un nombre entre 1 et 10 en trois essais ;
+- une victoire rapporte entre 10 et 20 points ;
+- le joueur gagne un niveau tous les 30 points ;
+- le score et le niveau sont enregistrés dans `users.json`.
+
+Il faut d'abord créer un compte avec `auth.py`, puis lancer le jeu :
+
+```bash
+python auth.py
+python jeu.py
+```
