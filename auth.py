@@ -80,6 +80,11 @@ def main():
     elif choix == "2":
         if authenticate_user(nom, mot_de_passe):
             print("Connexion réussie !")
+
+            # Le jeu démarre seulement après une connexion réussie.
+            from jeu import jouer
+
+            jouer(nom)
         else:
             print("Identifiants incorrects.")
 

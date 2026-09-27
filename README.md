@@ -223,9 +223,10 @@ Le fichier `jeu.py` contient un jeu du nombre mystère :
 - le joueur gagne un niveau tous les 30 points ;
 - le score et le niveau sont enregistrés dans `users.json`.
 
-Il faut d'abord créer un compte avec `auth.py`, puis lancer le jeu :
+Lancez le programme principal :
 
 ```bash
 python auth.py
-python jeu.py
 ```
+
+Choisissez `1` pour créer un compte. Relancez ensuite le programme, choisissez `2` et connectez-vous : le jeu démarre automatiquement après une connexion réussie. Sans identifiants valides, il est impossible de jouer ou d'enregistrer une progression.
