@@ -180,3 +180,38 @@ git add .
 git commit -m "Message clair"
 git push
 ```
+
+## Projet pratique : système d'authentification Python
+
+Le fichier `auth.py` contient un système local d'inscription et de connexion. Il utilise uniquement la bibliothèque standard de Python :
+
+- les utilisateurs sont enregistrés dans un fichier JSON local ;
+- les mots de passe ne sont jamais stockés en clair ;
+- chaque mot de passe est haché avec `scrypt` et un sel aléatoire ;
+- les noms d'utilisateur ne sont pas sensibles aux majuscules.
+
+### Prérequis
+
+- Python 3.10 ou une version plus récente.
+
+### Créer un compte
+
+```bash
+python auth.py register
+```
+
+### Se connecter
+
+```bash
+python auth.py login
+```
+
+Les mots de passe saisis ne sont pas affichés dans le terminal. Le fichier `users.json` est créé automatiquement et ignoré par Git afin de ne pas publier les comptes.
+
+### Lancer les tests
+
+```bash
+python -m unittest -v
+```
+
+Ce projet est un exemple pédagogique d'authentification locale. Pour un site en production, il faut utiliser le système d'authentification éprouvé d'un framework web, protéger les sessions, activer HTTPS et prévoir une limitation des tentatives de connexion.
