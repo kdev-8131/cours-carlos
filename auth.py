@@ -1,261 +1,154 @@
-"""Système d'authentification local avec stockage JSON.
+"""Petit système d'inscription et de connexion pour débuter en Python."""
 
-Ce fichier est volontairement commenté comme un mini-cours. Il montre le
-chemin complet : saisir un mot de passe, le hacher, enregistrer le résultat,
-puis vérifier ce mot de passe lors d'une connexion.
-"""
-
-from __future__ import annotations
-
-import argparse
-import base64
 import getpass
 import hashlib
 import hmac
 import json
 import os
-import re
-import tempfile
-from pathlib import Path
-from typing import Any
 
 
-# MINI-LEÇON 1 — Les constantes
-# Une constante centralise une valeur qui ne doit pas changer pendant
-# l'exécution. Le fichier JSON sera créé à côté de ce script.
-DEFAULT_STORAGE = Path(__file__).with_name("users.json")
-
-# Une expression régulière définit ici les caractères autorisés dans un nom.
-USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{3,30}$")
-
-# Ces paramètres règlent le coût de scrypt. Un calcul volontairement coûteux
-# ralentit les tentatives massives de découverte des mots de passe.
-SCRYPT_N = 2**14
-SCRYPT_R = 8
-SCRYPT_P = 1
+FICHIER_UTILISATEURS = "users.json"
 
 
-def load_users(storage: str | Path = DEFAULT_STORAGE) -> list[dict[str, Any]]:
-    """Charge les comptes depuis le fichier JSON."""
-    # MINI-LEÇON 2 — Lire du JSON
-    # JSON transforme des données structurées en texte. json.load effectue
-    # l'opération inverse et reconstruit les dictionnaires et les listes Python.
-    path = Path(storage)
-    if not path.exists():
-        # Au premier lancement, aucun fichier n'existe encore : la liste des
-        # utilisateurs est donc simplement vide.
+# MINI-LEÇON 1 : une fonction regroupe des instructions réutilisables.
+def charger_utilisateurs(fichier=FICHIER_UTILISATEURS):
+    """Retourne la liste des utilisateurs enregistrés."""
+    if not os.path.exists(fichier):
         return []
 
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-    except (json.JSONDecodeError, OSError) as error:
-        raise RuntimeError(f"Impossible de lire {path} : {error}") from error
-
-    # Ne jamais supposer qu'un fichier externe contient le bon format.
-    if not isinstance(data, dict) or not isinstance(data.get("users"), list):
-        raise RuntimeError(f"Le fichier {path} ne possède pas un format valide.")
-    return data["users"]
+    with open(fichier, "r", encoding="utf-8") as fichier_json:
+        donnees = json.load(fichier_json)
+        return donnees["utilisateurs"]
 
 
-def save_users(users: list[dict[str, Any]], storage: str | Path) -> None:
-    """Enregistre les comptes avec un remplacement atomique du fichier."""
-    # MINI-LEÇON 3 — Écrire sans abîmer le fichier
-    # On écrit d'abord dans un fichier temporaire, puis os.replace le déplace.
-    # Ainsi, une interruption pendant l'écriture ne laisse pas un JSON à moitié
-    # rempli à la place du fichier principal.
-    path = Path(storage)
-    path.parent.mkdir(parents=True, exist_ok=True)
+# MINI-LEÇON 2 : JSON permet d'enregistrer des listes et dictionnaires.
+def sauvegarder_utilisateurs(utilisateurs, fichier=FICHIER_UTILISATEURS):
+    """Enregistre la liste des utilisateurs dans le fichier JSON."""
+    donnees = {"utilisateurs": utilisateurs}
 
-    temporary_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as file:
-            json.dump({"users": users}, file, ensure_ascii=False, indent=2)
-            file.write("\n")
-            temporary_path = Path(file.name)
-        os.replace(temporary_path, path)
-    finally:
-        if temporary_path is not None and temporary_path.exists():
-            temporary_path.unlink()
+    with open(fichier, "w", encoding="utf-8") as fichier_json:
+        json.dump(donnees, fichier_json, indent=2, ensure_ascii=False)
 
 
-def validate_username(username: str) -> None:
-    # MINI-LEÇON 4 — Valider les entrées
-    # Les données venant d'un utilisateur doivent toujours être contrôlées
-    # avant d'être utilisées ou enregistrées.
-    if not USERNAME_PATTERN.fullmatch(username):
-        raise ValueError(
-            "Le nom d'utilisateur doit contenir entre 3 et 30 caractères : "
-            "lettres, chiffres, tiret ou tiret bas."
-        )
+# MINI-LEÇON 3 : on stocke une empreinte, jamais le mot de passe en clair.
+def hacher_mot_de_passe(mot_de_passe, sel):
+    """Crée une empreinte sécurisée du mot de passe."""
+    empreinte = hashlib.pbkdf2_hmac(
+        "sha256",
+        mot_de_passe.encode("utf-8"),
+        sel.encode("utf-8"),
+        100_000,
+    )
+    return empreinte.hex()
 
 
-def validate_password(password: str) -> None:
-    # Plusieurs règles simples évitent les mots de passe trop faibles. Dans une
-    # vraie application, une phrase de passe longue est souvent préférable.
-    if len(password) < 8:
+def register_user(nom, mot_de_passe, fichier=FICHIER_UTILISATEURS):
+    """Crée un compte. Retourne True si l'inscription réussit."""
+    nom = nom.strip()
+
+    # MINI-LEÇON 4 : il faut vérifier les données saisies par l'utilisateur.
+    if len(nom) < 3:
+        raise ValueError("Le nom doit contenir au moins 3 caractères.")
+
+    if len(mot_de_passe) < 8:
         raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
-    if not any(character.isalpha() for character in password):
-        raise ValueError("Le mot de passe doit contenir au moins une lettre.")
-    if not any(character.isdigit() for character in password):
-        raise ValueError("Le mot de passe doit contenir au moins un chiffre.")
 
+    utilisateurs = charger_utilisateurs(fichier)
 
-def hash_password(password: str, salt: bytes) -> bytes:
-    # MINI-LEÇON 5 — Hacher n'est pas chiffrer
-    # Un chiffrement peut être inversé avec une clé. Un hachage de mot de passe
-    # est conçu pour être à sens unique : on compare les empreintes sans
-    # retrouver ni enregistrer le mot de passe original.
-    return hashlib.scrypt(
-        password.encode("utf-8"),
-        salt=salt,
-        n=SCRYPT_N,
-        r=SCRYPT_R,
-        p=SCRYPT_P,
-    )
+    for utilisateur in utilisateurs:
+        if utilisateur["nom"].lower() == nom.lower():
+            return False
 
+    # MINI-LEÇON 5 : le sel rend l'empreinte unique pour chaque compte.
+    sel = os.urandom(16).hex()
+    empreinte = hacher_mot_de_passe(mot_de_passe, sel)
 
-def register_user(
-    username: str,
-    password: str,
-    storage: str | Path = DEFAULT_STORAGE,
-) -> bool:
-    """Crée un compte et retourne False si le nom existe déjà."""
-    username = username.strip()
-    validate_username(username)
-    validate_password(password)
+    nouvel_utilisateur = {
+        "nom": nom,
+        "empreinte": empreinte,
+        "sel": sel,
+    }
 
-    # MINI-LEÇON 6 — Le sel
-    # Chaque compte reçoit 16 octets aléatoires. Deux utilisateurs ayant le
-    # même mot de passe auront ainsi des empreintes différentes.
-    salt = os.urandom(16)
-    password_hash = hash_password(password, salt)
-
-    users = load_users(storage)
-    # casefold permet une comparaison sans tenir compte des majuscules.
-    if any(user["username"].casefold() == username.casefold() for user in users):
-        return False
-
-    # JSON ne sait pas stocker directement des octets. Base64 les représente
-    # sous forme de texte. Attention : Base64 n'est pas un chiffrement.
-    users.append(
-        {
-            "username": username,
-            "password_hash": base64.b64encode(password_hash).decode("ascii"),
-            "salt": base64.b64encode(salt).decode("ascii"),
-        }
-    )
-    save_users(users, storage)
+    utilisateurs.append(nouvel_utilisateur)
+    sauvegarder_utilisateurs(utilisateurs, fichier)
     return True
 
 
-def authenticate_user(
-    username: str,
-    password: str,
-    storage: str | Path = DEFAULT_STORAGE,
-) -> bool:
-    """Vérifie les identifiants sans révéler la cause d'un échec."""
-    # MINI-LEÇON 7 — Authentifier
-    # On retrouve le compte, on recalcule l'empreinte avec le sel enregistré,
-    # puis on compare cette empreinte avec celle du fichier JSON.
-    normalized_username = username.strip().casefold()
-    user = next(
-        (
-            item
-            for item in load_users(storage)
-            if item["username"].casefold() == normalized_username
-        ),
-        None,
-    )
-    if user is None:
-        return False
+def authenticate_user(nom, mot_de_passe, fichier=FICHIER_UTILISATEURS):
+    """Retourne True si le nom et le mot de passe sont corrects."""
+    utilisateurs = charger_utilisateurs(fichier)
+
+    for utilisateur in utilisateurs:
+        if utilisateur["nom"].lower() == nom.strip().lower():
+            nouvelle_empreinte = hacher_mot_de_passe(
+                mot_de_passe,
+                utilisateur["sel"],
+            )
+
+            # MINI-LEÇON 6 : on compare les empreintes, pas les mots de passe.
+            return hmac.compare_digest(
+                nouvelle_empreinte,
+                utilisateur["empreinte"],
+            )
+
+    return False
+
+
+def creer_un_compte():
+    """Demande les informations nécessaires pour créer un compte."""
+    nom = input("Nom d'utilisateur : ")
+
+    # getpass masque le mot de passe pendant la saisie.
+    mot_de_passe = getpass.getpass("Mot de passe : ")
 
     try:
-        stored_hash = base64.b64decode(user["password_hash"], validate=True)
-        salt = base64.b64decode(user["salt"], validate=True)
-    except (KeyError, TypeError, ValueError) as error:
-        raise RuntimeError("Les données du compte sont invalides.") from error
-    candidate_hash = hash_password(password, salt)
+        compte_cree = register_user(nom, mot_de_passe)
+    except ValueError as erreur:
+        print("Erreur :", erreur)
+        return
 
-    # compare_digest limite les différences de durée entre deux comparaisons et
-    # réduit les informations exploitables par une attaque temporelle.
-    return hmac.compare_digest(stored_hash, candidate_hash)
-
-
-def register_command(storage: Path) -> int:
-    username = input("Nom d'utilisateur : ")
-    # MINI-LEÇON 8 — Saisir un secret
-    # getpass masque le mot de passe dans le terminal, contrairement à input.
-    password = getpass.getpass("Mot de passe : ")
-    confirmation = getpass.getpass("Confirmez le mot de passe : ")
-
-    if password != confirmation:
-        print("Les mots de passe ne correspondent pas.")
-        return 1
-
-    try:
-        created = register_user(username, password, storage)
-    except ValueError as error:
-        print(f"Erreur : {error}")
-        return 1
-
-    if not created:
+    if compte_cree:
+        print("Compte créé avec succès !")
+    else:
         print("Ce nom d'utilisateur existe déjà.")
-        return 1
-
-    print("Compte créé avec succès.")
-    return 0
 
 
-def login_command(storage: Path) -> int:
-    username = input("Nom d'utilisateur : ")
-    password = getpass.getpass("Mot de passe : ")
+def se_connecter():
+    """Demande les informations nécessaires pour se connecter."""
+    nom = input("Nom d'utilisateur : ")
+    mot_de_passe = getpass.getpass("Mot de passe : ")
 
-    if authenticate_user(username, password, storage):
-        print(f"Bienvenue, {username.strip()} !")
-        return 0
-
-    print("Nom d'utilisateur ou mot de passe incorrect.")
-    return 1
-
-
-def build_parser() -> argparse.ArgumentParser:
-    # MINI-LEÇON 9 — Une interface en ligne de commande
-    # argparse lit les arguments, affiche l'aide et refuse les actions inconnues.
-    parser = argparse.ArgumentParser(
-        description="Inscription et connexion avec stockage local JSON."
-    )
-    parser.add_argument(
-        "--file",
-        type=Path,
-        default=DEFAULT_STORAGE,
-        help="chemin du fichier JSON (users.json par défaut)",
-    )
-    parser.add_argument(
-        "action",
-        choices=("register", "login"),
-        help="register pour créer un compte, login pour se connecter",
-    )
-    return parser
+    if authenticate_user(nom, mot_de_passe):
+        print("Connexion réussie. Bienvenue", nom, "!")
+    else:
+        print("Nom d'utilisateur ou mot de passe incorrect.")
 
 
-def main() -> int:
-    # 0 signifie succès pour le système ; une autre valeur signale une erreur.
-    arguments = build_parser().parse_args()
-    if arguments.action == "register":
-        return register_command(arguments.file)
-    return login_command(arguments.file)
+def afficher_menu():
+    """Affiche le menu principal."""
+    print("\n--- Système d'authentification ---")
+    print("1 - Créer un compte")
+    print("2 - Se connecter")
+    print("3 - Quitter")
 
 
+def main():
+    # MINI-LEÇON 7 : la boucle garde le menu ouvert jusqu'au choix Quitter.
+    while True:
+        afficher_menu()
+        choix = input("Votre choix : ")
+
+        if choix == "1":
+            creer_un_compte()
+        elif choix == "2":
+            se_connecter()
+        elif choix == "3":
+            print("Au revoir !")
+            break
+        else:
+            print("Choix invalide.")
+
+
+# Ce bloc est exécuté uniquement si on lance directement : python auth.py
 if __name__ == "__main__":
-    # Cette condition lance main uniquement quand auth.py est exécuté directement.
-    # Lors d'un import depuis les tests, les fonctions restent disponibles sans
-    # démarrer l'interface interactive.
-    raise SystemExit(main())
+    main()

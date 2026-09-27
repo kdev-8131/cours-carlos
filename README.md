@@ -194,17 +194,13 @@ Le fichier `auth.py` contient un système local d'inscription et de connexion. I
 
 - Python 3.10 ou une version plus récente.
 
-### Créer un compte
+### Lancer le programme
 
 ```bash
-python auth.py register
+python auth.py
 ```
 
-### Se connecter
-
-```bash
-python auth.py login
-```
+Un menu permet ensuite de créer un compte, de se connecter ou de quitter.
 
 Les mots de passe saisis ne sont pas affichés dans le terminal. Le fichier `users.json` est créé automatiquement et ignoré par Git afin de ne pas publier les comptes.
 
